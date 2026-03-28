@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>2つの波の合成波シミュレーション</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background-color: #f0f4f8; color: #333; margin: 0; padding: 20px; }
+        .container { display: inline-block; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 900px; }
+        canvas { background-color: #ffffff; border: 1px solid #ccc; border-radius: 4px; display: block; margin: 0 auto; }
+        
+        .control-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .wave-group { background: #f8f9fa; padding: 15px; border-radius: 8px; border-top: 4px solid #ccc; }
+        .wave-a { border-top-color: #007bff; }
+        .wave-b { border-top-color: #28a745; }
+        
+        .slider-group { display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; background: white; padding: 5px; border-radius: 4px; border: 1px solid #eee; }
+        .slider-group label { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
+        input[type=range] { width: 90%; cursor: pointer; }
+
+        .common-controls { grid-column: 1 / -1; background: #eee; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; }
+        .button-group { display: flex; justify-content: center; gap: 10px; }
+        button { padding: 10px 20px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; width: 120px; transition: 0.2s; }
+        #pauseBtn { background-color: #28a745; color: white; }
+        #resetBtn { background-color: #dc3545; color: white; }
+        
+        .time-area, .density-area { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+        .instruction { font-size: 11px; color: #777; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h3>2つの波の合成波シミュレーション</h3>
+    
+    <canvas id="waveCanvas" width="850" height="350"></canvas>
+
+    <div class="control-panel">
+        <div class="wave-group wave-a">
+            <strong>波A (青)</strong>
+            <div class="slider-group">
+                <label>振幅 A₁: <span id="val-ampA">40</span></label>
+                <input type="range" id="ampA" min="0" max="80" value="40">
+            </div>
+            <div class="slider-group">
+                <label>波長 λ₁: <span id="val-lambdaA">4.0</span> [m]</label>
+                <input type="range" id="lambdaA" min="1" max="10" value="4" step="0.1">
+            </div>
+            <div class="slider-group">
+                <label>速さ v₁: <span id="val-speedA">3.5</span> [m/s]</label>
+                <input type="range" id="speedA" min="0" max="5" value="3.5" step="0.1">
+            </div>
+        </div>
+
+        <div class="wave-group wave-b">
+            <strong>波B (緑)</strong>
+            <div class="slider-group">
+                <label>振幅 A₂: <span id="val-ampB">40</span></label>
+                <input type="range" id="ampB" min="0" max="80" value="40">
+            </div>
+            <div class="slider-group">
+                <label>波長 λ₂: <span id="val-lambdaB">4.0</span> [m]</label>
+                <input type="range" id="lambdaB" min="1" max="10" value="4" step="0.1">
+            </div>
+            <div class="slider-group">
+                <label>速さ v₂: <span id="val-speedB">3.5</span> [m/s]</label>
+                <input type="range" id="speedB" min="0" max="5" value="3.5" step="0.1">
+            </div>
+        </div>
+
+        <div class="common-controls">
+            <div class="button-group">
+                <button id="pauseBtn">▶ 再生</button>
+                <button id="resetBtn">リセット</button>
+            </div>
+            <div class="instruction">※スペースキーでも再生/停止を切り替えられます</div>
+            
+            <div class="slider-group time-area">
+                <label>時間 t: <span id="val-time">0.00</span> [s]</label>
+                <input type="range" id="timeSlider" min="0" max="10" value="0" step="0.01">
+            </div>
+
+            <div class="slider-group density-area">
+                <label>媒質の間隔: <span id="val-density">0.5</span> [m]</label>
+                <input type="range" id="density" min="0.1" max="2.0" value="0.5" step="0.1">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    const elements = {
+        ampA: document.getElementById('ampA'), lambdaA: document.getElementById('lambdaA'), speedA: document.getElementById('speedA'),
+        ampB: document.getElementById('ampB'), lambdaB: document.getElementById('lambdaB'), speedB: document.getElementById('speedB'),
+        density: document.getElementById('density'),
+        timeSlider: document.getElementById('timeSlider'),
+        pauseBtn: document.getElementById('pauseBtn'),
+        resetBtn: document.getElementById('resetBtn')
+    };
+
+    const PX_M = 50; 
+    const CENTER_Y = canvas.height / 2;
+    const CANVAS_WIDTH_M = canvas.width / PX_M;
+    
+    let isPaused = true;
+    let t = 0;
+
+    // デフォルト値の設定 (速さを 3.5 に設定)
+    const defaults = { amp: 40, lambda: 4.0, speed: 3.5, density: 0.5, time: 0 };
+
+    function togglePlayPause() {
+        isPaused = !isPaused;
+        updatePauseUI();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            togglePlayPause();
+        }
+    });
+
+    function drawArrow(x, y, length, direction, color) {
+        const headlen = 10;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (direction === 'right' ? length : -length), y);
+        ctx.stroke();
+        const sign = direction === 'right' ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(x + length * sign, y);
+        ctx.lineTo(x + (length-headlen) * sign, y - headlen/1.5);
+        ctx.moveTo(x + length * sign, y);
+        ctx.lineTo(x + (length-headlen) * sign, y + headlen/1.5);
+        ctx.stroke();
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = '#f0f0f0';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= canvas.width; x += PX_M) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            ctx.fillStyle = '#aaa'; ctx.font = '10px Arial';
+            if (x % 100 === 0) ctx.fillText((x / PX_M) + 'm', x + 2, canvas.height - 5);
+        }
+        for (let y = 0; y <= canvas.height; y += PX_M) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, CENTER_Y); ctx.lineTo(canvas.width, CENTER_Y); ctx.stroke();
+    }
+
+    function animate() {
+        const a1 = parseFloat(elements.ampA.value), l1 = parseFloat(elements.lambdaA.value), v1 = parseFloat(elements.speedA.value);
+        const a2 = parseFloat(elements.ampB.value), l2 = parseFloat(elements.lambdaB.value), v2 = parseFloat(elements.speedB.value);
+        const densM = parseFloat(elements.density.value);
+
+        document.getElementById('val-ampA').textContent = a1;
+        document.getElementById('val-lambdaA').textContent = l1.toFixed(1);
+        document.getElementById('val-speedA').textContent = v1.toFixed(1);
+        document.getElementById('val-ampB').textContent = a2;
+        document.getElementById('val-lambdaB').textContent = l2.toFixed(1);
+        document.getElementById('val-speedB').textContent = v2.toFixed(1);
+        document.getElementById('val-density').textContent = densM.toFixed(1);
+
+        if (!isPaused) {
+            t += 0.01;
+            elements.timeSlider.value = t;
+            if (t >= 10) { t = 10; isPaused = true; updatePauseUI(); }
+        } else {
+            t = parseFloat(elements.timeSlider.value);
+        }
+        document.getElementById('val-time').textContent = t.toFixed(2);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+
+        const k1 = (2 * Math.PI) / l1;
+        const k2 = (2 * Math.PI) / l2;
+
+        const headA_M = (1.5 * l1) + v1 * t;
+        const headB_M = (CANVAS_WIDTH_M - 1.5 * l2) - v2 * t;
+
+        const pointsA = [], pointsB = [], pointsSum = [];
+
+        for (let px = 0; px <= canvas.width; px += 1) {
+            const xM = px / PX_M;
+            let yA = 0, yB = 0;
+            if (xM <= headA_M) yA = a1 * Math.sin(k1 * (xM - headA_M));
+            if (xM >= headB_M) yB = a2 * Math.sin(k2 * (headB_M - xM));
+            
+            pointsA.push({x: px, y: CENTER_Y + yA});
+            pointsB.push({x: px, y: CENTER_Y + yB});
+            if (xM <= headA_M && xM >= headB_M) pointsSum.push({x: px, y: CENTER_Y + (yA + yB)});
+        }
+
+        drawArrow(20, CENTER_Y - 110, 40, 'right', 'rgba(0,0,255,0.8)');
+        drawArrow(canvas.width - 20, CENTER_Y - 110, 40, 'left', 'rgba(0,128,0,0.8)');
+
+        drawPath(pointsA, 'rgba(0, 0, 255, 0.4)', 2);
+        drawPath(pointsB, 'rgba(0, 128, 0, 0.4)', 2);
+        if (pointsSum.length > 0) drawPath(pointsSum, 'red', 3);
+
+        const stepPX = densM * PX_M;
+        for (let px = 0; px <= canvas.width; px += stepPX) {
+            const xM = px / PX_M;
+            let yA = 0, yB = 0;
+            if (xM <= headA_M) yA = a1 * Math.sin(k1 * (xM - headA_M));
+            if (xM >= headB_M) yB = a2 * Math.sin(k2 * (headB_M - xM));
+            ctx.beginPath();
+            ctx.arc(px, CENTER_Y + (yA + yB), 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
+        }
+
+        requestAnimationFrame(animate);
+    }
+
+    function drawPath(points, color, width) {
+        if (points.length < 2) return;
+        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width;
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+    }
+
+    function updatePauseUI() {
+        elements.pauseBtn.textContent = isPaused ? "▶ 再生" : "❚❚ 停止";
+        elements.pauseBtn.style.backgroundColor = isPaused ? "#28a745" : "#ffc107";
+    }
+
+    elements.pauseBtn.onclick = togglePlayPause;
+    
+    elements.resetBtn.onclick = () => {
+        t = defaults.time;
+        elements.timeSlider.value = defaults.time;
+        elements.ampA.value = elements.ampB.value = defaults.amp;
+        elements.lambdaA.value = elements.lambdaB.value = defaults.lambda;
+        elements.speedA.value = elements.speedB.value = defaults.speed;
+        elements.density.value = defaults.density;
+        isPaused = true;
+        updatePauseUI();
+    };
+
+    elements.timeSlider.oninput = () => { isPaused = true; updatePauseUI(); };
+
+    animate();
+</script>
+
+</body>
+</html>
