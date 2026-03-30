@@ -2,13 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <!-- JavaScriptから操作できるようにidを追加 -->
-    <meta id="myViewport" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Viewportの動的書き換えをやめ、標準的で安全な設定に固定します -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2つの波の合成波シミュレーション</title>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background-color: #f0f4f8; color: #333; margin: 0; padding: 20px; }
         .container { display: inline-block; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 900px; width: 100%; box-sizing: border-box; }
-        canvas { background-color: #ffffff; border: 1px solid #ccc; border-radius: 4px; display: block; margin: 0 auto; }
+        
+        /* キャンバスは画面幅に合わせて自動的に縮小されます */
+        canvas { background-color: #ffffff; border: 1px solid #ccc; border-radius: 4px; display: block; margin: 0 auto; max-width: 100%; height: auto; touch-action: none; }
         
         /* 基本レイアウト (PC・iPad・スマホ横向き用: 2カラム) */
         .control-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
@@ -18,22 +20,18 @@
         
         .slider-group { display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; background: white; padding: 5px; border-radius: 4px; border: 1px solid #eee; }
         .slider-group label { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
-        input[type=range] { width: 90%; cursor: pointer; }
+        input[type=range] { width: 90%; cursor: pointer; touch-action: none; }
 
         .common-controls { grid-column: 1 / -1; background: #eee; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; }
         .button-group { display: flex; justify-content: center; gap: 10px; }
-        button { padding: 10px 20px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; width: 120px; transition: 0.2s; }
+        button { padding: 10px 20px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; width: 120px; transition: 0.2s; touch-action: none; }
         #pauseBtn { background-color: #28a745; color: white; }
         #resetBtn { background-color: #dc3545; color: white; }
         
         .time-area, .density-area { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
         .instruction { font-size: 11px; color: #777; margin-top: 5px; }
 
-        /* タッチ・スマホ対応共通設定 */
-        canvas, button, input[type=range] { touch-action: none; }
-        canvas { max-width: 100%; height: auto; } /* 画面幅に合わせて自動縮小 */
-
-        /* 画面の向き(orientation)で判定する */
+        /* 縦向きの時だけ適用されるレイアウト (スマホ縦向き用: 1カラム) */
         @media (orientation: portrait) {
             body { padding: 10px; }
             .container { padding: 15px; }
@@ -260,21 +258,6 @@
     };
 
     elements.timeSlider.oninput = () => { isPaused = true; updatePauseUI(); };
-
-    // 端末の向きに合わせてViewportを動的に切り替える
-    function adjustViewport() {
-        const viewportMeta = document.getElementById('myViewport');
-        if (window.matchMedia("(orientation: portrait)").matches) {
-            // 縦向き：等倍表示にして、1カラムで操作しやすくする
-            viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-        } else {
-            // 横向き：全体を縮小して、iPad/PCと同じ2カラム配置を強制する
-            viewportMeta.setAttribute('content', 'width=950, user-scalable=no');
-        }
-    }
-    window.addEventListener('resize', adjustViewport);
-    window.addEventListener('orientationchange', adjustViewport);
-    adjustViewport(); // 読み込み時に1回実行
 
     animate();
 </script>
