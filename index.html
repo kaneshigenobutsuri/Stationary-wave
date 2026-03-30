@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <!-- 端末の幅に合わせ、ズームを防止する設定 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- JavaScriptから操作できるようにidを追加 -->
+    <meta id="myViewport" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2つの波の合成波シミュレーション</title>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background-color: #f0f4f8; color: #333; margin: 0; padding: 20px; }
@@ -33,15 +33,13 @@
         canvas, button, input[type=range] { touch-action: none; }
         canvas { max-width: 100%; height: auto; } /* 画面幅に合わせて自動縮小 */
 
-        /* 縦向き・画面幅が狭い時のレイアウト (スマホ縦向き用: 1カラム) */
-        @media (max-width: 768px) {
+        /* 画面の向き(orientation)で判定する */
+        @media (orientation: portrait) {
             body { padding: 10px; }
             .container { padding: 15px; }
             .control-panel { grid-template-columns: 1fr; /* 1カラムに変更 */ }
         }
     </style>
-    <meta property="og:image" content="https://kaneshigenobutsuri.github.io/Stationary-wave/ogp-image.png">
-<meta property="og:description" content="ここにサイトの説明文を書きます。">
 </head>
 <body>
 
@@ -262,6 +260,21 @@
     };
 
     elements.timeSlider.oninput = () => { isPaused = true; updatePauseUI(); };
+
+    // 端末の向きに合わせてViewportを動的に切り替える
+    function adjustViewport() {
+        const viewportMeta = document.getElementById('myViewport');
+        if (window.matchMedia("(orientation: portrait)").matches) {
+            // 縦向き：等倍表示にして、1カラムで操作しやすくする
+            viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+        } else {
+            // 横向き：全体を縮小して、iPad/PCと同じ2カラム配置を強制する
+            viewportMeta.setAttribute('content', 'width=950, user-scalable=no');
+        }
+    }
+    window.addEventListener('resize', adjustViewport);
+    window.addEventListener('orientationchange', adjustViewport);
+    adjustViewport(); // 読み込み時に1回実行
 
     animate();
 </script>
